@@ -19,7 +19,7 @@ import (
 
 type Entry struct {
 	Ts       uint32
-	Lat, Lng float64
+	Lat, Lng float32
 }
 
 func TestCompareCompress(t *testing.T) {
@@ -80,7 +80,6 @@ func TestEncodeDecode(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		t.Log("Parsing", filename)
 		entries := readTSCoordAsEntries(file)
 		file.Close()
 
@@ -94,17 +93,17 @@ func TestEncodeDecode(t *testing.T) {
 			ts, lat, lng := itr.Values()
 			e := entries[i]
 			if ts != e.Ts {
-				t.Fatalf("%s ts not equal %d expected %d\nexpected: %s\nuncompressed: %d %f %f",
-					filename, ts, e.Ts, e.String(), ts, lat, lng)
+				t.Fatalf("%s ts not equal %d expected %d\nexpected: %s\nuncompressed: %d %f %f\nline %d",
+					filename, ts, e.Ts, e.String(), ts, lng, lat, i+1)
 			}
 			// places   degrees          distance
 			// -------  -------          --------
 			// 5        0.00001          1.11 m
 			if !inDelta(lat, e.Lat, 0.00002) {
-				t.Fatal("Lat not in delta", lat, "expected", e.Lat)
+				t.Fatalf("Lat not in delta %f expected %f file: %s line: %d", lat, e.Lat, filename, i+1)
 			}
 			if !inDelta(lng, e.Lng, 0.00002) {
-				t.Fatal("Lng not in delta", lng, "expected", e.Lng)
+				t.Fatalf("Lng not in delta %f expected %f file: %s line: %d", lng, e.Lng, filename, i+1)
 			}
 			i++
 		}
@@ -117,7 +116,7 @@ func TestEncodeDecode(t *testing.T) {
 }
 
 // readTSCoordAsFloats encodes time series as binary
-// ts uint32, lng, lat float64
+// ts uint32, lng, lat float32
 func readTSCoordAsFloats(r io.Reader) []byte {
 	csvr := csv.NewReader(r)
 
@@ -142,19 +141,19 @@ func readTSCoordAsFloats(r io.Reader) []byte {
 			log.Fatal(err)
 		}
 		// parse coordinates
-		lng, err := strconv.ParseFloat(records[2], 64)
+		lng, err := strconv.ParseFloat(records[2], 32)
 		if err != nil {
 			log.Fatal(err)
 		}
-		lat, err := strconv.ParseFloat(records[3], 64)
+		lat, err := strconv.ParseFloat(records[3], 32)
 		if err != nil {
 			log.Fatal(err)
 		}
-		err = binary.Write(buf, binary.BigEndian, lat)
+		err = binary.Write(buf, binary.BigEndian, float32(lat))
 		if err != nil {
 			log.Fatal(err)
 		}
-		err = binary.Write(buf, binary.BigEndian, lng)
+		err = binary.Write(buf, binary.BigEndian, float32(lng))
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -185,18 +184,18 @@ func readTSCoordAsEntries(r io.Reader) []Entry {
 		tsu := uint32(ts.Unix())
 
 		// parse coordinates
-		lng, err := strconv.ParseFloat(records[2], 64)
+		lng, err := strconv.ParseFloat(records[2], 32)
 		if err != nil {
 			log.Fatal(err)
 		}
-		lat, err := strconv.ParseFloat(records[3], 64)
+		lat, err := strconv.ParseFloat(records[3], 32)
 		if err != nil {
 			log.Fatal(err)
 		}
 		e := Entry{
 			Ts:  tsu,
-			Lat: lat,
-			Lng: lng,
+			Lat: float32(lat),
+			Lng: float32(lng),
 		}
 
 		res = append(res, e)
@@ -219,7 +218,7 @@ func taxiDataFiles() []string {
 	return res
 }
 
-func inDelta(v, expected, delta float64) bool {
+func inDelta(v, expected, delta float32) bool {
 	if v < expected-delta {
 		return false
 	}

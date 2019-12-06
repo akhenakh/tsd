@@ -1,30 +1,26 @@
 package tsd
 
 import (
+	"bytes"
 	"encoding/binary"
-	"encoding/hex"
-	"fmt"
-
-	"github.com/golang/geo/s2"
+	"math"
 )
-
-const meterLevel = 23
 
 type TimeSeries struct {
 	// Format is as follow
-	// header ts uint32,  cellID
-	//     32               64
+	// header ts uint32,   lat float32, lng float32
+	//     32                  32           32
 
-	// time delta,   cell delta
-	//    16,        64
+	//  info,  time delta dyn,   lat dyn, lng dyn
+	//   1          n,                   n,      n
 	b []byte
 
 	// starting date
 	t0 uint32
 
 	// current
-	t uint32
-	c uint64
+	t        uint32
+	lat, lng int32
 }
 
 type Iter struct {
@@ -32,42 +28,95 @@ type Iter struct {
 	i  uint
 
 	// current
-	t uint32
-	c uint64
+	t        uint32
+	lat, lng int32
 }
 
 func New() *TimeSeries {
 	return &TimeSeries{}
 }
 
-// Push a ts, a value and uint64 cell representation
-func (ts *TimeSeries) Push(t uint32, lat, lng float64) {
-	ll := s2.LatLngFromDegrees(lat, lng)
-	c := uint64(s2.CellIDFromLatLng(ll).Parent(meterLevel))
-
+// Push a ts and lat lng
+func (ts *TimeSeries) Push(t uint32, lat, lng float32) {
 	// simply write as is
 	if len(ts.b) == 0 {
-		b := make([]byte, 12)
-		binary.BigEndian.PutUint32(b, t)
-		binary.BigEndian.PutUint64(b[4:], c)
-		ts.b = b
+		buf := new(bytes.Buffer)
+		binary.Write(buf, binary.BigEndian, t)
+		ts.lat = int32(math.Round(float64(lat) * 100_000))
+		ts.lng = int32(math.Round(float64(lng) * 100_000))
+		binary.Write(buf, binary.BigEndian, ts.lat)
+		binary.Write(buf, binary.BigEndian, ts.lng)
+
+		ts.b = buf.Bytes()
 		ts.t0 = t
 		ts.t = t
-		ts.c = c
 		return
 	}
 
-	b := make([]byte, 10)
-	tDelta := uint16(t - ts.t)
-	binary.BigEndian.PutUint16(b, tDelta)
-	//cDelta := ts.c - c
-	//binary.BigEndian.PutUint64(b[2:], cDelta)
-	binary.BigEndian.PutUint64(b[2:], c)
-	//fmt.Printf("push tDelta %d cDelta %d hex %s\ncell: %d old cell: %d\n", tDelta, cDelta, hex.EncodeToString(b), c, ts.c)
-	fmt.Printf("push tDelta %d c %d hex %s\ncell: %d old cell: %d\n", tDelta, c, hex.EncodeToString(b), c, ts.c)
+	// at most it will take 1 + 12
+	buf := new(bytes.Buffer)
+
+	var denc DeltaEncoding
+
+	// delta encoding TS
+	tDelta := t - ts.t
+	switch {
+	case tDelta <= math.MaxUint8:
+		denc = TSDelta8
+		tDelta8 := uint8(t - ts.t)
+		binary.Write(buf, binary.BigEndian, tDelta8)
+	case tDelta <= math.MaxUint16:
+		denc = TSDelta16
+		tDelta16 := uint16(t - ts.t)
+		binary.Write(buf, binary.BigEndian, tDelta16)
+	default:
+		denc = TSFull32
+		binary.Write(buf, binary.BigEndian, t)
+	}
+
+	// delta encoding lat
+	ilat := int64(math.Round(float64(lat) * 100_000))
+	latDelta := ilat - int64(ts.lat)
+	switch {
+	case latDelta == 0:
+		denc ^= LatDelta0 << 2
+	case latDelta <= math.MaxInt8 && latDelta >= math.MinInt8:
+		denc ^= LatDelta8 << 2
+		latDelta8 := int8(latDelta)
+		binary.Write(buf, binary.BigEndian, latDelta8)
+	case latDelta <= math.MaxInt16 && latDelta >= math.MinInt16:
+		denc ^= LatDelta16 << 2
+		latDelta16 := int16(latDelta)
+		binary.Write(buf, binary.BigEndian, latDelta16)
+	default:
+		denc ^= LatFull32 << 2
+		binary.Write(buf, binary.BigEndian, int32(ilat))
+	}
+
+	// delta encoding lng
+	ilng := int64(math.Round(float64(lng) * 100_000))
+	lngDelta := ilng - int64(ts.lng)
+	switch {
+	case lngDelta == 0:
+		denc ^= LngDelta0 << 4
+	case lngDelta <= math.MaxInt8 && lngDelta >= math.MinInt8:
+		denc ^= LngDelta8 << 4
+		lngDelta8 := int8(lngDelta)
+		binary.Write(buf, binary.BigEndian, lngDelta8)
+	case lngDelta <= math.MaxInt16 && lngDelta >= math.MinInt16:
+		denc ^= LngDelta16 << 4
+		lngDelta16 := int16(lngDelta)
+		binary.Write(buf, binary.BigEndian, lngDelta16)
+	default:
+		denc ^= LngFull32 << 4
+		binary.Write(buf, binary.BigEndian, int32(ilng))
+	}
+
 	ts.t = t
-	ts.c = c
-	ts.b = append(ts.b, b...)
+	ts.lat += int32(latDelta)
+	ts.lng += int32(lngDelta)
+	ts.b = append(ts.b, byte(denc))
+	ts.b = append(ts.b, buf.Bytes()...)
 }
 
 func (ts *TimeSeries) MarshalBinary() ([]byte, error) {
@@ -85,32 +134,62 @@ func (itr *Iter) Next() bool {
 
 	// read header
 	if itr.i == 0 {
-		itr.t = binary.BigEndian.Uint32(itr.ts.b)
-		itr.c = binary.BigEndian.Uint64(itr.ts.b[4:])
+		buf := bytes.NewReader(itr.ts.b)
+		binary.Read(buf, binary.BigEndian, &itr.t)
+		binary.Read(buf, binary.BigEndian, &itr.lat)
+		binary.Read(buf, binary.BigEndian, &itr.lng)
+
 		itr.i = 12
 		return true
 	}
 
-	if itr.i+10 > uint(len(itr.ts.b)) {
+	// the minimum viable size is 1B
+	if itr.i+1 > uint(len(itr.ts.b)) {
 		return false
 	}
 
-	//fmt.Println("DEBUG Read", hex.EncodeToString(itr.ts.b[itr.i+2:itr.i+10]))
+	denc := DeltaEncoding(itr.ts.b[itr.i])
+	itr.i += 1
 
-	tDelta := binary.BigEndian.Uint16(itr.ts.b[itr.i:])
-	itr.t += uint32(tDelta)
-	//fmt.Println("DEBUG val", tDelta, itr.t)
+	switch denc.TSDelta() {
+	case TSDelta8:
+		itr.t += uint32(itr.ts.b[itr.i])
+		itr.i += 1
+	case TSDelta16:
+		itr.t += uint32(binary.BigEndian.Uint16(itr.ts.b[itr.i:]))
+		itr.i += 2
+	case TSFull32:
+		itr.t = binary.BigEndian.Uint32(itr.ts.b[itr.i:])
+		itr.i += 4
+	}
 
-	//cDelta := binary.BigEndian.Uint64(itr.ts.b[itr.i+2:])
-	//itr.c = itr.c - cDelta
-	itr.c = binary.BigEndian.Uint64(itr.ts.b[itr.i+2:])
-	itr.i += 10
+	switch denc.LatDelta() {
+	case LatDelta8:
+		itr.lat += int32(int8(itr.ts.b[itr.i]))
+		itr.i += 1
+	case LatDelta16:
+		itr.lat += int32(int16(binary.BigEndian.Uint16(itr.ts.b[itr.i:])))
+		itr.i += 2
+	case LatFull32:
+		itr.lat = int32(binary.BigEndian.Uint32(itr.ts.b[itr.i:]))
+		itr.i += 4
+	}
+
+	switch denc.LngDelta() {
+	case LngDelta8:
+		itr.lng += int32(int8(itr.ts.b[itr.i]))
+		itr.i += 1
+	case LngDelta16:
+		itr.lng += int32(int16(binary.BigEndian.Uint16(itr.ts.b[itr.i:])))
+		itr.i += 2
+	case LngFull32:
+		itr.lng = int32(binary.BigEndian.Uint32(itr.ts.b[itr.i:]))
+		itr.i += 4
+	}
 	return true
 }
 
 // Values returns ts, lat, lng
-func (itr *Iter) Values() (uint32, float64, float64) {
-	ll := s2.CellID(itr.c).LatLng()
-
-	return itr.t, ll.Lat.Degrees(), ll.Lng.Degrees()
+func (itr *Iter) Values() (uint32, float32, float32) {
+	return itr.t, float32(itr.lat) / 100_000, float32(itr.lng) / 100_000
 }
