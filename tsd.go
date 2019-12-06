@@ -123,6 +123,14 @@ func (ts *TimeSeries) MarshalBinary() ([]byte, error) {
 	return ts.b, nil
 }
 
+func (ts *TimeSeries) UnmarshalBinary(data []byte) error {
+	ts.b = data
+	itr := ts.Iter()
+	for itr.Next() {
+	}
+	return nil
+}
+
 func (ts *TimeSeries) Iter() *Iter {
 	return &Iter{ts: ts}
 }

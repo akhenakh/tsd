@@ -3,13 +3,15 @@ TSD
 
 TSD is a time series storage specialized in compressing increasing timestamp and geo spacial data (lat, lng).
 
-It performs better than Snappy & LZ4, on this specific usage without any kind of optimizations but storing deltas.
+It performs better than Snappy & LZ4, on this specific usage without any kind of optimizations but storing deltas and storage size reduction.
 
 ```
 Size: 20088 Snappy 20068    LZ4 18229       TSC 8868
 ```
 
 ## Usage
+
+It implements [`BinaryMarshaler`](https://golang.org/pkg/encoding/#BinaryMarshaler) and [`BinaryUnmarshaler`](https://golang.org/pkg/encoding/#BinaryUnmarshaler)
 ```go
 ts := New()
 ts.Push(1201984833, 39.91071, 116.50962)

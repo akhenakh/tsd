@@ -14,9 +14,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/akhenakh/tsd"
 	"github.com/golang/snappy"
 	"github.com/pierrec/lz4"
+
+	"github.com/akhenakh/tsd"
 )
 
 type Entry struct {
@@ -73,6 +74,35 @@ func TestCompareCompress(t *testing.T) {
 		}
 
 		t.Logf("Size: %d\tSnappy %d\tLZ4 %d\tTSC %d", fullSize, snapSize, lz4Size, tscSize)
+	}
+}
+
+func TestUnmarshalBinary(t *testing.T) {
+	b, _ := hex.DecodeString("47a4d541003ce61f00b1c792290258020504f5290258ff711075")
+	ts := tsd.New()
+	err := ts.UnmarshalBinary(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	itr := ts.Iter()
+	i := 0
+	for itr.Next() {
+		i++
+		if i == 3 {
+			ts, lat, lng := itr.Values()
+			if ts != 1201986033 {
+				t.Fatal("got invalid final ts")
+			}
+			if lat != 39.91445 {
+				t.Fatal("got invalid final lng")
+			}
+			if lng != 116.56444 {
+				t.Fatal("got invalid final lat")
+			}
+		}
+	}
+	if i != 3 {
+		t.Fatal("expected 3 values")
 	}
 }
 
