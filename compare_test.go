@@ -23,7 +23,7 @@ type Entry struct {
 }
 
 func TestCompareCompress(t *testing.T) {
-	for _, filename := range taxiDataFiles()[:200] {
+	for _, filename := range taxiDataFiles()[:10] {
 		file, err := os.Open(filename)
 		if err != nil {
 			t.Fatal(err)
@@ -75,11 +75,12 @@ func TestCompareCompress(t *testing.T) {
 }
 
 func TestEncodeDecode(t *testing.T) {
-	for _, filename := range taxiDataFiles()[2:] {
+	for _, filename := range taxiDataFiles()[:10] {
 		file, err := os.Open(filename)
 		if err != nil {
 			t.Fatal(err)
 		}
+		t.Log("parsing ", filename)
 		entries := readTSCoordAsEntries(file)
 		file.Close()
 
