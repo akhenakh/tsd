@@ -31,7 +31,7 @@ func TestCompareCompress(t *testing.T) {
 			t.Fatal(err)
 		}
 		b := readTSCoordAsFloats(file)
-
+		fullSize := len(b)
 		// Snappy
 		sn := snappy.Encode(nil, b)
 		snapSize := len(sn)
@@ -72,7 +72,7 @@ func TestCompareCompress(t *testing.T) {
 			t.Log("Snappy better Compressed", snapSize, len(b))
 		}
 
-		t.Logf("Snappy %d LZ4 %d TSC %d", snapSize, lz4Size, tscSize)
+		t.Logf("Size: %d\tSnappy %d\tLZ4 %d\tTSC %d", fullSize, snapSize, lz4Size, tscSize)
 	}
 }
 
