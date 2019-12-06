@@ -1,9 +1,10 @@
-package tsd
+package tsd_test
 
 import (
 	"bytes"
 	"encoding/binary"
 	"encoding/csv"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -13,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/akhenakh/tsd"
 	"github.com/golang/snappy"
 	"github.com/pierrec/lz4"
 )
@@ -55,7 +57,7 @@ func TestCompareCompress(t *testing.T) {
 		entries := readTSCoordAsEntries(file)
 		file.Close()
 
-		ts := New()
+		ts := tsd.New()
 		for _, e := range entries {
 			ts.Push(e.Ts, e.Lat, e.Lng)
 		}
@@ -84,7 +86,7 @@ func TestEncodeDecode(t *testing.T) {
 		entries := readTSCoordAsEntries(file)
 		file.Close()
 
-		ts := New()
+		ts := tsd.New()
 		for _, e := range entries {
 			ts.Push(e.Ts, e.Lat, e.Lng)
 		}
@@ -114,6 +116,16 @@ func TestEncodeDecode(t *testing.T) {
 		}
 
 	}
+}
+
+func ExamplePush() {
+	ts := tsd.New()
+	ts.Push(1201984833, 39.91071, 116.50962)
+	ts.Push(1201985433, 39.91588, 116.52231)
+	ts.Push(1201986033, 39.91445, 116.56444)
+	b, _ := ts.MarshalBinary()
+	fmt.Println(hex.EncodeToString(b))
+	// Output: 47a4d541003ce61f00b1c792290258020504f5290258ff711075
 }
 
 // readTSCoordAsFloats encodes time series as binary
