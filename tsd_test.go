@@ -112,34 +112,44 @@ func TestDeltaOfDelta(t *testing.T) {
 	ts.Push(1201986040, 48.83, 2.23)
 	ts.Push(1201986050, 48.84, 2.24)
 	ts.Push(1201986060, 48.85, 2.25)
-	// length should be
-	// header 32 + 32 +32                       = 12B
-	// control 8 + delta8 + delta16 + delta16   = 6B
-	// control 8 + 0 + 0                        = 1B
-	// control 8 + 0 + 0                        = 1B
-	b, _ := ts.MarshalBinary()
-	if len(b) != 20 {
-		t.Fatal("expected 20 bytes got ", len(b))
-	}
+	ts.Push(1201986071, 48.86, 2.26)
+	// we also want to test a time with a diff larger than max uint32
+	bigTime := uint32(1301986081)
+	ts.Push(bigTime, 48.87, 2.27)
+	ts.Push(bigTime+10, 48.87, 2.27)
+	ts.Push(bigTime+20, 48.87, 2.27)
+
 	itr := ts.Iter()
 	i := 0
 	for itr.Next() {
 		i++
-		if i == 3 {
+		if i == 5 {
 			ts, lat, lng := itr.Values()
-			if ts != 1201986060 {
-				t.Fatal("got invalid final ts")
+			if ts != 1201986071 {
+				t.Fatal("got invalid final ts", ts, "expected", 1201986071)
 			}
-			if lat != 48.84 {
-				t.Fatal("got invalid final lng")
+			if lat != 48.87 {
+				t.Fatal("got invalid final lat", lat, "expected", 48.87)
 			}
-			if lng != 2.24 {
-				t.Fatal("got invalid final lat")
+			if lng != 2.27 {
+				t.Fatal("got invalid final lng", lng, "expected", 2.27)
+			}
+		}
+		if i == 6 {
+			ts, _, _ := itr.Values()
+			if ts != bigTime {
+				t.Fatal("got invalid final ts", ts, "expected", bigTime)
+			}
+		}
+		if i == 8 {
+			ts, _, _ := itr.Values()
+			if ts != bigTime+20 {
+				t.Fatal("got invalid final ts", ts, "expected", bigTime+20)
 			}
 		}
 	}
-	if i != 3 {
-		t.Fatal("expected 3 values")
+	if i != 8 {
+		t.Fatal("expected 8 values got", i)
 	}
 }
 

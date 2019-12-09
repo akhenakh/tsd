@@ -20,7 +20,7 @@ type TimeSeries struct {
 
 	// current
 	t                  uint32
-	tDelta             int32
+	tdod, tdelta       uint32
 	lat, lng           int32
 	latDelta, lngDelta int32
 }
@@ -31,7 +31,7 @@ type Iter struct {
 
 	// current
 	t        uint32
-	tDelta   int32
+	tDelta   uint32
 	lat, lng int32
 }
 
@@ -62,24 +62,34 @@ func (ts *TimeSeries) Push(t uint32, lat, lng float32) {
 	var denc DeltaEncoding
 
 	// delta of delta encoding TS
-	delta := int32(t - ts.t)
-	tDelta := ts.tDelta - delta
-	ts.tDelta = delta
+
+	// checking for the 1st entry case
+	if len(ts.b) == 4+4+4 {
+		ts.tdelta = t - ts.t
+		ts.tdod = ts.tdelta
+	} else {
+		ndelta := t - ts.t
+		ts.tdod = ndelta - ts.tdelta
+		ts.tdelta = ndelta
+	}
+	ts.t = t
 
 	switch {
-	case tDelta == 0:
+	case ts.tdod == 0:
 		denc = TSDelta0
-	case tDelta <= math.MaxUint8:
+	case ts.tdod <= math.MaxUint8:
 		denc = TSDelta8
-		tDelta8 := uint8(t - ts.t)
+		tDelta8 := uint8(ts.tdod)
 		binary.Write(buf, binary.BigEndian, tDelta8)
-	case tDelta <= math.MaxUint16:
+	case ts.tdod <= math.MaxUint16:
 		denc = TSDelta16
-		tDelta16 := uint16(t - ts.t)
+		tDelta16 := uint16(ts.tdod)
 		binary.Write(buf, binary.BigEndian, tDelta16)
 	default:
 		denc = TSFull32
 		binary.Write(buf, binary.BigEndian, t)
+		ts.tdod = 0
+		ts.tdelta = 0
 	}
 
 	// delta of delta encoding lat
@@ -128,8 +138,8 @@ func (ts *TimeSeries) Push(t uint32, lat, lng float32) {
 	}
 
 	ts.t = t
-	ts.lat += int32(latDelta)
-	ts.lng += int32(lngDelta)
+	ts.lat += latDelta
+	ts.lng += lngDelta
 	ts.b = append(ts.b, byte(denc))
 	ts.b = append(ts.b, buf.Bytes()...)
 }
@@ -174,20 +184,24 @@ func (itr *Iter) Next() bool {
 	denc := DeltaEncoding(itr.ts.b[itr.i])
 	itr.i += 1
 
-	var delta uint32
+	var dod uint32
 
 	switch denc.TSDelta() {
 	case TSDelta8:
-		delta = uint32(itr.ts.b[itr.i])
-		itr.t += delta
+		dod = uint32(itr.ts.b[itr.i])
 		itr.i += 1
 	case TSDelta16:
-		itr.t += uint32(binary.BigEndian.Uint16(itr.ts.b[itr.i:]))
+		dod = uint32(binary.BigEndian.Uint16(itr.ts.b[itr.i:]))
 		itr.i += 2
 	case TSFull32:
 		itr.t = binary.BigEndian.Uint32(itr.ts.b[itr.i:])
 		itr.i += 4
+		itr.tDelta = 0
+		dod = 0
 	}
+
+	itr.t += itr.tDelta + dod
+	itr.tDelta = itr.tDelta + dod
 
 	switch denc.LatDelta() {
 	case LatDelta8:
