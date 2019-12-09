@@ -78,7 +78,7 @@ func TestCompareCompress(t *testing.T) {
 }
 
 func TestUnmarshalBinary(t *testing.T) {
-	b, _ := hex.DecodeString("47a4d541003ce61f00b1c7922a0258020504f52a0258ff711075")
+	b, _ := hex.DecodeString("47a4d541003ce61f00b1c7922a0258020504f528fd6c0b80")
 	ts := tsd.New()
 	err := ts.UnmarshalBinary(b)
 	if err != nil {
@@ -110,10 +110,10 @@ func TestDeltaOfDelta(t *testing.T) {
 	ts := tsd.New()
 	const aTime = uint32(1201986030)
 	ts.Push(aTime, 48.82, 2.22)
-	ts.Push(aTime+10, 48.83, 2.23)
-	ts.Push(aTime+20, 48.84, 2.24)
-	ts.Push(aTime+30, 48.85, 2.25)
-	ts.Push(aTime+41, 48.86, 2.26)
+	ts.Push(aTime+10, 48.83001, 2.23)
+	ts.Push(aTime+20, 48.83002, 2.24)
+	ts.Push(aTime+30, 48.83003, 2.25)
+	ts.Push(aTime+41, 48.83004, 2.26)
 	// we also want to test a time with a diff larger than max uint32
 	const bigTime = uint32(1301986081)
 	ts.Push(bigTime, 48.87, 2.27)
@@ -129,8 +129,8 @@ func TestDeltaOfDelta(t *testing.T) {
 			if ts != aTime+41 {
 				t.Fatal("got invalid final ts", ts, "expected", aTime+41)
 			}
-			if lat != 48.86 {
-				t.Fatal("got invalid final lat", lat, "expected", 48.86)
+			if lat != 48.83004 {
+				t.Fatal("got invalid final lat", lat, "expected", 48.83004)
 			}
 			if lng != 2.26 {
 				t.Fatal("got invalid final lng", lng, "expected", 2.26)

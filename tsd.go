@@ -3,7 +3,6 @@ package tsd
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"math"
 )
 
@@ -136,22 +135,22 @@ func (ts *TimeSeries) Push(t uint32, lat, lng float32) {
 	}
 	ts.lng = ilng
 
-	fmt.Printf("DEBUG encoding ts %d %d lat %d\t%d\t\t%d\t\tlng\t\t%d\t\t%d\t%d\n", ts.t, ts.tdelta, ilat, ts.latdelta, ts.latdod, ilng, ts.lngdelta, ts.lngdod)
+	//fmt.Printf("DEBUG encoding ts %d %d lat %d\t%d\t\t%d\t\tlng\t\t%d\t\t%d\t%d\n", ts.t, ts.tdelta, ilat, ts.latdelta, ts.latdod, ilng, ts.lngdelta, ts.lngdod)
 
 	switch {
 	case ts.lngdod == 0:
 		denc ^= LngDelta0 << 4
 	case ts.lngdod <= math.MaxInt8 && ts.lngdod >= math.MinInt8:
 		denc ^= LngDelta8 << 4
-		latDelta8 := int8(ts.lngdod)
-		binary.Write(buf, binary.BigEndian, latDelta8)
+		lngDelta8 := int8(ts.lngdod)
+		binary.Write(buf, binary.BigEndian, lngDelta8)
 	case ts.lngdod <= math.MaxInt16 && ts.lngdod >= math.MinInt16:
 		denc ^= LngDelta16 << 4
-		latDelta16 := int16(ts.lngdod)
-		binary.Write(buf, binary.BigEndian, latDelta16)
+		lngDelta16 := int16(ts.lngdod)
+		binary.Write(buf, binary.BigEndian, lngDelta16)
 	default:
 		denc ^= LngFull32 << 4
-		binary.Write(buf, binary.BigEndian, ilat)
+		binary.Write(buf, binary.BigEndian, ilng)
 	}
 
 	ts.b = append(ts.b, byte(denc))
@@ -220,6 +219,8 @@ func (itr *Iter) Next() bool {
 	var dodCoord int32
 
 	switch denc.LatDelta() {
+	case LatDelta0:
+		dodCoord = 0
 	case LatDelta8:
 		dodCoord = int32(int8(itr.ts.b[itr.i]))
 		itr.i += 1
@@ -235,9 +236,11 @@ func (itr *Iter) Next() bool {
 
 	itr.lat += itr.latdelta + dodCoord
 	itr.latdelta = itr.latdelta + dodCoord
-	fmt.Printf("DEBUG decoding ts %d %d lat %d\t%d\t\t%d\t\t", itr.t, itr.tdelta, itr.lat, itr.latdelta, dodCoord)
+	//fmt.Printf("DEBUG decoding ts %d %d lat %d\t%d\t\t%d\t\t", itr.t, itr.tdelta, itr.lat, itr.latdelta, dodCoord)
 
 	switch denc.LngDelta() {
+	case LngDelta0:
+		dodCoord = 0
 	case LngDelta8:
 		dodCoord = int32(int8(itr.ts.b[itr.i]))
 		itr.i += 1
@@ -253,7 +256,7 @@ func (itr *Iter) Next() bool {
 
 	itr.lng += itr.lngdelta + dodCoord
 	itr.lngdelta = itr.lngdelta + dodCoord
-	fmt.Printf("lng %d\t%d\t\t%d\n", itr.lng, itr.lngdelta, dodCoord)
+	//fmt.Printf("lng %d\t%d\t\t%d\n", itr.lng, itr.lngdelta, dodCoord)
 
 	return true
 }
