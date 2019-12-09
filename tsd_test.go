@@ -108,13 +108,14 @@ func TestUnmarshalBinary(t *testing.T) {
 
 func TestDeltaOfDelta(t *testing.T) {
 	ts := tsd.New()
-	ts.Push(1201986030, 48.82, 2.22)
-	ts.Push(1201986040, 48.83, 2.23)
-	ts.Push(1201986050, 48.84, 2.24)
-	ts.Push(1201986060, 48.85, 2.25)
-	ts.Push(1201986071, 48.86, 2.26)
+	const aTime = uint32(1201986030)
+	ts.Push(aTime, 48.82, 2.22)
+	ts.Push(aTime+10, 48.83, 2.23)
+	ts.Push(aTime+20, 48.84, 2.24)
+	ts.Push(aTime+30, 48.85, 2.25)
+	ts.Push(aTime+41, 48.86, 2.26)
 	// we also want to test a time with a diff larger than max uint32
-	bigTime := uint32(1301986081)
+	const bigTime = uint32(1301986081)
 	ts.Push(bigTime, 48.87, 2.27)
 	ts.Push(bigTime+10, 48.87, 2.27)
 	ts.Push(bigTime+20, 48.87, 2.27)
@@ -125,14 +126,14 @@ func TestDeltaOfDelta(t *testing.T) {
 		i++
 		if i == 5 {
 			ts, lat, lng := itr.Values()
-			if ts != 1201986071 {
-				t.Fatal("got invalid final ts", ts, "expected", 1201986071)
+			if ts != aTime+41 {
+				t.Fatal("got invalid final ts", ts, "expected", aTime+41)
 			}
-			if lat != 48.87 {
-				t.Fatal("got invalid final lat", lat, "expected", 48.87)
+			if lat != 48.86 {
+				t.Fatal("got invalid final lat", lat, "expected", 48.86)
 			}
-			if lng != 2.27 {
-				t.Fatal("got invalid final lng", lng, "expected", 2.27)
+			if lng != 2.26 {
+				t.Fatal("got invalid final lng", lng, "expected", 2.26)
 			}
 		}
 		if i == 6 {
@@ -142,9 +143,15 @@ func TestDeltaOfDelta(t *testing.T) {
 			}
 		}
 		if i == 8 {
-			ts, _, _ := itr.Values()
+			ts, lat, lng := itr.Values()
 			if ts != bigTime+20 {
 				t.Fatal("got invalid final ts", ts, "expected", bigTime+20)
+			}
+			if lat != 48.87 {
+				t.Fatal("got invalid final lat", lat, "expected", 48.87)
+			}
+			if lng != 2.27 {
+				t.Fatal("got invalid final lng", lng, "expected", 2.27)
 			}
 		}
 	}
@@ -202,7 +209,7 @@ func ExamplePush() {
 	ts.Push(1201986033, 39.91445, 116.56444)
 	b, _ := ts.MarshalBinary()
 	fmt.Println(hex.EncodeToString(b))
-	// Output: 47a4d541003ce61f00b1c7922a0258020504f52a0258ff711075
+	// Output: 47a4d541003ce61f00b1c7922a0258020504f528fd6c0b80
 }
 
 // readTSCoordAsFloats encodes time series as binary

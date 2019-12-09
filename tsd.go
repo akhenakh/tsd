@@ -3,6 +3,7 @@ package tsd
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"math"
 )
 
@@ -22,7 +23,8 @@ type TimeSeries struct {
 	t                  uint32
 	tdod, tdelta       uint32
 	lat, lng           int32
-	latDelta, lngDelta int32
+	latdod, lngdod     int32
+	latdelta, lngdelta int32
 }
 
 type Iter struct {
@@ -30,9 +32,10 @@ type Iter struct {
 	i  uint
 
 	// current
-	t        uint32
-	tDelta   uint32
-	lat, lng int32
+	t                  uint32
+	tdelta             uint32
+	lat, lng           int32
+	latdelta, lngdelta int32
 }
 
 func New() *TimeSeries {
@@ -61,8 +64,7 @@ func (ts *TimeSeries) Push(t uint32, lat, lng float32) {
 
 	var denc DeltaEncoding
 
-	// delta of delta encoding TS
-
+	// encoding TS
 	// checking for the 1st entry case
 	if len(ts.b) == 4+4+4 {
 		ts.tdelta = t - ts.t
@@ -92,54 +94,66 @@ func (ts *TimeSeries) Push(t uint32, lat, lng float32) {
 		ts.tdelta = 0
 	}
 
-	// delta of delta encoding lat
-	// D = (tn – tn-1) – (tn-1 – tn-2)
-	ilat := int64(math.Round(float64(lat) * 100_000))
-	lattDelta := -(ilat - int64(ts.lat))
-	ts.lat = int32(ilat)
-	latDelta := ts.latDelta - int32(lattDelta)
-	ts.latDelta = int32(latDelta)
+	// encoding latitude
+	ilat := int32(math.Round(float64(lat) * 100_000))
+	// checking for the 1st entry case
+	if len(ts.b) == 4+4+4 {
+		ts.latdelta = ilat - ts.lat
+		ts.latdod = ts.latdelta
+	} else {
+		ndelta := ilat - ts.lat
+		ts.latdod = ndelta - ts.latdelta
+		ts.latdelta = ndelta
+	}
+	ts.lat = ilat
+
 	switch {
-	case latDelta == 0:
+	case ts.latdod == 0:
 		denc ^= LatDelta0 << 2
-	case latDelta <= math.MaxInt8 && latDelta >= math.MinInt8:
+	case ts.latdod <= math.MaxInt8 && ts.latdod >= math.MinInt8:
 		denc ^= LatDelta8 << 2
-		latDelta8 := int8(latDelta)
+		latDelta8 := int8(ts.latdod)
 		binary.Write(buf, binary.BigEndian, latDelta8)
-	case latDelta <= math.MaxInt16 && latDelta >= math.MinInt16:
+	case ts.latdod <= math.MaxInt16 && ts.latdod >= math.MinInt16:
 		denc ^= LatDelta16 << 2
-		latDelta16 := int16(latDelta)
+		latDelta16 := int16(ts.latdod)
 		binary.Write(buf, binary.BigEndian, latDelta16)
 	default:
 		denc ^= LatFull32 << 2
-		binary.Write(buf, binary.BigEndian, int32(ilat))
+		binary.Write(buf, binary.BigEndian, ilat)
 	}
 
-	// delta encoding lng
-	ilng := int64(math.Round(float64(lng) * 100_000))
-	lngtDelta := -(ilng - int64(ts.lng))
-	ts.lng = int32(ilng)
-	lngDelta := ts.lngDelta - int32(lngtDelta)
-	ts.lngDelta = int32(lngtDelta)
+	// encoding longitude
+	ilng := int32(math.Round(float64(lng) * 100_000))
+	// checking for the 1st entry case
+	if len(ts.b) == 4+4+4 {
+		ts.lngdelta = ilng - ts.lng
+		ts.lngdod = ts.lngdelta
+	} else {
+		ndelta := ilng - ts.lng
+		ts.lngdod = ndelta - ts.lngdelta
+		ts.lngdelta = ndelta
+	}
+	ts.lng = ilng
+
+	fmt.Printf("DEBUG encoding ts %d %d lat %d\t%d\t\t%d\t\tlng\t\t%d\t\t%d\t%d\n", ts.t, ts.tdelta, ilat, ts.latdelta, ts.latdod, ilng, ts.lngdelta, ts.lngdod)
+
 	switch {
-	case lngDelta == 0:
+	case ts.lngdod == 0:
 		denc ^= LngDelta0 << 4
-	case lngDelta <= math.MaxInt8 && lngDelta >= math.MinInt8:
+	case ts.lngdod <= math.MaxInt8 && ts.lngdod >= math.MinInt8:
 		denc ^= LngDelta8 << 4
-		lngDelta8 := int8(lngDelta)
-		binary.Write(buf, binary.BigEndian, lngDelta8)
-	case lngDelta <= math.MaxInt16 && lngDelta >= math.MinInt16:
+		latDelta8 := int8(ts.lngdod)
+		binary.Write(buf, binary.BigEndian, latDelta8)
+	case ts.lngdod <= math.MaxInt16 && ts.lngdod >= math.MinInt16:
 		denc ^= LngDelta16 << 4
-		lngDelta16 := int16(lngDelta)
-		binary.Write(buf, binary.BigEndian, lngDelta16)
+		latDelta16 := int16(ts.lngdod)
+		binary.Write(buf, binary.BigEndian, latDelta16)
 	default:
 		denc ^= LngFull32 << 4
-		binary.Write(buf, binary.BigEndian, int32(ilng))
+		binary.Write(buf, binary.BigEndian, ilat)
 	}
 
-	ts.t = t
-	ts.lat += latDelta
-	ts.lng += lngDelta
 	ts.b = append(ts.b, byte(denc))
 	ts.b = append(ts.b, buf.Bytes()...)
 }
@@ -196,36 +210,51 @@ func (itr *Iter) Next() bool {
 	case TSFull32:
 		itr.t = binary.BigEndian.Uint32(itr.ts.b[itr.i:])
 		itr.i += 4
-		itr.tDelta = 0
+		itr.tdelta = 0
 		dod = 0
 	}
 
-	itr.t += itr.tDelta + dod
-	itr.tDelta = itr.tDelta + dod
+	itr.t += itr.tdelta + dod
+	itr.tdelta = itr.tdelta + dod
+
+	var dodCoord int32
 
 	switch denc.LatDelta() {
 	case LatDelta8:
-		itr.lat += int32(int8(itr.ts.b[itr.i]))
+		dodCoord = int32(int8(itr.ts.b[itr.i]))
 		itr.i += 1
 	case LatDelta16:
-		itr.lat += int32(int16(binary.BigEndian.Uint16(itr.ts.b[itr.i:])))
+		dodCoord = int32(int16(binary.BigEndian.Uint16(itr.ts.b[itr.i:])))
 		itr.i += 2
 	case LatFull32:
 		itr.lat = int32(binary.BigEndian.Uint32(itr.ts.b[itr.i:]))
 		itr.i += 4
+		itr.latdelta = 0
+		dodCoord = 0
 	}
+
+	itr.lat += itr.latdelta + dodCoord
+	itr.latdelta = itr.latdelta + dodCoord
+	fmt.Printf("DEBUG decoding ts %d %d lat %d\t%d\t\t%d\t\t", itr.t, itr.tdelta, itr.lat, itr.latdelta, dodCoord)
 
 	switch denc.LngDelta() {
 	case LngDelta8:
-		itr.lng += int32(int8(itr.ts.b[itr.i]))
+		dodCoord = int32(int8(itr.ts.b[itr.i]))
 		itr.i += 1
 	case LngDelta16:
-		itr.lng += int32(int16(binary.BigEndian.Uint16(itr.ts.b[itr.i:])))
+		dodCoord = int32(int16(binary.BigEndian.Uint16(itr.ts.b[itr.i:])))
 		itr.i += 2
 	case LngFull32:
 		itr.lng = int32(binary.BigEndian.Uint32(itr.ts.b[itr.i:]))
 		itr.i += 4
+		itr.lngdelta = 0
+		dodCoord = 0
 	}
+
+	itr.lng += itr.lngdelta + dodCoord
+	itr.lngdelta = itr.lngdelta + dodCoord
+	fmt.Printf("lng %d\t%d\t\t%d\n", itr.lng, itr.lngdelta, dodCoord)
+
 	return true
 }
 
