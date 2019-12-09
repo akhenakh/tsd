@@ -78,7 +78,7 @@ func TestCompareCompress(t *testing.T) {
 }
 
 func TestUnmarshalBinary(t *testing.T) {
-	b, _ := hex.DecodeString("47a4d541003ce61f00b1c792290258020504f5290258ff711075")
+	b, _ := hex.DecodeString("47a4d541003ce61f00b1c7922a0258020504f52a0258ff711075")
 	ts := tsd.New()
 	err := ts.UnmarshalBinary(b)
 	if err != nil {
@@ -97,6 +97,43 @@ func TestUnmarshalBinary(t *testing.T) {
 				t.Fatal("got invalid final lng")
 			}
 			if lng != 116.56444 {
+				t.Fatal("got invalid final lat")
+			}
+		}
+	}
+	if i != 3 {
+		t.Fatal("expected 3 values")
+	}
+}
+
+func TestDeltaOfDelta(t *testing.T) {
+	ts := tsd.New()
+	ts.Push(1201986030, 48.82, 2.22)
+	ts.Push(1201986040, 48.83, 2.23)
+	ts.Push(1201986050, 48.84, 2.24)
+	ts.Push(1201986060, 48.85, 2.25)
+	// length should be
+	// header 32 + 32 +32                       = 12B
+	// control 8 + delta8 + delta16 + delta16   = 6B
+	// control 8 + 0 + 0                        = 1B
+	// control 8 + 0 + 0                        = 1B
+	b, _ := ts.MarshalBinary()
+	if len(b) != 20 {
+		t.Fatal("expected 20 bytes got ", len(b))
+	}
+	itr := ts.Iter()
+	i := 0
+	for itr.Next() {
+		i++
+		if i == 3 {
+			ts, lat, lng := itr.Values()
+			if ts != 1201986060 {
+				t.Fatal("got invalid final ts")
+			}
+			if lat != 48.84 {
+				t.Fatal("got invalid final lng")
+			}
+			if lng != 2.24 {
 				t.Fatal("got invalid final lat")
 			}
 		}
@@ -155,7 +192,7 @@ func ExamplePush() {
 	ts.Push(1201986033, 39.91445, 116.56444)
 	b, _ := ts.MarshalBinary()
 	fmt.Println(hex.EncodeToString(b))
-	// Output: 47a4d541003ce61f00b1c792290258020504f5290258ff711075
+	// Output: 47a4d541003ce61f00b1c7922a0258020504f52a0258ff711075
 }
 
 // readTSCoordAsFloats encodes time series as binary

@@ -3,7 +3,7 @@ TSD
 
 TSD is a time series storage specialized in compressing increasing timestamp and geo spacial data (lat, lng).
 
-It performs better than Snappy & LZ4, on this specific usage without any kind of optimizations but storing deltas and storage size reduction.
+It performs better than Snappy & LZ4, on this specific usage without any advanced optimizations but storing deltas and storage size reduction.
 
 ```
 Size: 20088 Snappy 20068    LZ4 18229       TSC 8868
@@ -34,3 +34,8 @@ info,  time delta dyn,   lat delta dyn, lng delta dyn
 
 `n` can be 0, an int8, int16 or int32.
 
+## Optimization 
+The [Facebook's Gorilla paper](https://github.com/dgryski/go-tsz) would perform better but my needs were a bit different.
+
+I needed a time window larger than the limit imposed by the paper (14 bits ~ 4 hours), and a way to store 2 values lat, lng that are closed to the previous one (moving devices).  
+The timestamp storage is the same as the paper but for the values a delta of delta and appropriate storage per entry are good enough and perform better than dict compression.

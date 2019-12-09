@@ -3,9 +3,10 @@ package tsd
 type DeltaEncoding uint8
 
 const (
-	TSDelta8  DeltaEncoding = 0b00
-	TSDelta16               = 0b01
-	TSFull32                = 0b10
+	TSDelta0  DeltaEncoding = 0b00
+	TSDelta8                = 0b01
+	TSDelta16               = 0b10
+	TSFull32                = 0b11
 
 	LatDelta0  = 0b00
 	LatDelta8  = 0b01
@@ -25,6 +26,7 @@ func (d DeltaEncoding) TSDelta() DeltaEncoding {
 func (d DeltaEncoding) LatDelta() DeltaEncoding {
 	return d & 0b001100 >> 2
 }
+
 func (d DeltaEncoding) LngDelta() DeltaEncoding {
 	return d & 0b110000 >> 4
 }

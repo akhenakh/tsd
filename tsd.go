@@ -19,8 +19,10 @@ type TimeSeries struct {
 	t0 uint32
 
 	// current
-	t        uint32
-	lat, lng int32
+	t                  uint32
+	tDelta             int32
+	lat, lng           int32
+	latDelta, lngDelta int32
 }
 
 type Iter struct {
@@ -29,6 +31,7 @@ type Iter struct {
 
 	// current
 	t        uint32
+	tDelta   int32
 	lat, lng int32
 }
 
@@ -58,9 +61,14 @@ func (ts *TimeSeries) Push(t uint32, lat, lng float32) {
 
 	var denc DeltaEncoding
 
-	// delta encoding TS
-	tDelta := t - ts.t
+	// delta of delta encoding TS
+	delta := int32(t - ts.t)
+	tDelta := ts.tDelta - delta
+	ts.tDelta = delta
+
 	switch {
+	case tDelta == 0:
+		denc = TSDelta0
 	case tDelta <= math.MaxUint8:
 		denc = TSDelta8
 		tDelta8 := uint8(t - ts.t)
@@ -74,9 +82,13 @@ func (ts *TimeSeries) Push(t uint32, lat, lng float32) {
 		binary.Write(buf, binary.BigEndian, t)
 	}
 
-	// delta encoding lat
+	// delta of delta encoding lat
+	// D = (tn – tn-1) – (tn-1 – tn-2)
 	ilat := int64(math.Round(float64(lat) * 100_000))
-	latDelta := ilat - int64(ts.lat)
+	lattDelta := -(ilat - int64(ts.lat))
+	ts.lat = int32(ilat)
+	latDelta := ts.latDelta - int32(lattDelta)
+	ts.latDelta = int32(latDelta)
 	switch {
 	case latDelta == 0:
 		denc ^= LatDelta0 << 2
@@ -95,7 +107,10 @@ func (ts *TimeSeries) Push(t uint32, lat, lng float32) {
 
 	// delta encoding lng
 	ilng := int64(math.Round(float64(lng) * 100_000))
-	lngDelta := ilng - int64(ts.lng)
+	lngtDelta := -(ilng - int64(ts.lng))
+	ts.lng = int32(ilng)
+	lngDelta := ts.lngDelta - int32(lngtDelta)
+	ts.lngDelta = int32(lngtDelta)
 	switch {
 	case lngDelta == 0:
 		denc ^= LngDelta0 << 4
@@ -159,9 +174,12 @@ func (itr *Iter) Next() bool {
 	denc := DeltaEncoding(itr.ts.b[itr.i])
 	itr.i += 1
 
+	var delta uint32
+
 	switch denc.TSDelta() {
 	case TSDelta8:
-		itr.t += uint32(itr.ts.b[itr.i])
+		delta = uint32(itr.ts.b[itr.i])
+		itr.t += delta
 		itr.i += 1
 	case TSDelta16:
 		itr.t += uint32(binary.BigEndian.Uint16(itr.ts.b[itr.i:]))
