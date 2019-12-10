@@ -183,15 +183,16 @@ func TestEncodeDecode(t *testing.T) {
 				t.Fatalf("%s ts not equal %d expected %d\nexpected: %s\nuncompressed: %d %f %f\nline %d",
 					filename, ts, e.Ts, e.String(), ts, lng, lat, i+1)
 			}
+			if lat != e.Lat {
+				t.Fatalf("Lat not equal %f expected %f file: %s line: %d", lat, e.Lat, filename, i+1)
+			}
+			if lng != e.Lng {
+				t.Fatalf("Lng not equal %f expected %f file: %s line: %d", lng, e.Lng, filename, i+1)
+			}
 			// places   degrees          distance
 			// -------  -------          --------
 			// 5        0.00001          1.11 m
-			if !inDelta(lat, e.Lat, 0.00002) {
-				t.Fatalf("Lat not in delta %f expected %f file: %s line: %d", lat, e.Lat, filename, i+1)
-			}
-			if !inDelta(lng, e.Lng, 0.00002) {
-				t.Fatalf("Lng not in delta %f expected %f file: %s line: %d", lng, e.Lng, filename, i+1)
-			}
+
 			i++
 		}
 
@@ -216,7 +217,7 @@ func ExamplePush() {
 // ts uint32, lng, lat float32
 func readTSCoordAsFloats(r io.Reader) []byte {
 	csvr := csv.NewReader(r)
-
+	var ptsu uint32
 	buf := new(bytes.Buffer)
 	for {
 		records, err := csvr.Read()
@@ -233,10 +234,17 @@ func readTSCoordAsFloats(r io.Reader) []byte {
 			log.Fatal(err)
 		}
 		tsu := uint32(ts.Unix())
+		// skip bogus entries
+		if ptsu == tsu || ptsu > tsu {
+			continue
+		}
+		ptsu = tsu
+
 		err = binary.Write(buf, binary.BigEndian, tsu)
 		if err != nil {
 			log.Fatal(err)
 		}
+
 		// parse coordinates
 		lng, err := strconv.ParseFloat(records[2], 32)
 		if err != nil {
@@ -261,7 +269,7 @@ func readTSCoordAsFloats(r io.Reader) []byte {
 // readTSCoordAsEntries reads TS as struct
 func readTSCoordAsEntries(r io.Reader) []Entry {
 	csvr := csv.NewReader(r)
-
+	var ptsu uint32
 	var res []Entry
 	for {
 		records, err := csvr.Read()
@@ -279,6 +287,11 @@ func readTSCoordAsEntries(r io.Reader) []Entry {
 		}
 
 		tsu := uint32(ts.Unix())
+		// skip bogus entries
+		if ptsu == tsu || ptsu > tsu {
+			continue
+		}
+		ptsu = tsu
 
 		// parse coordinates
 		lng, err := strconv.ParseFloat(records[2], 32)
@@ -313,16 +326,6 @@ func taxiDataFiles() []string {
 		res = append(res, "./testdata/taxi_log_2008_by_id/"+file.Name())
 	}
 	return res
-}
-
-func inDelta(v, expected, delta float32) bool {
-	if v < expected-delta {
-		return false
-	}
-	if v > expected+delta {
-		return false
-	}
-	return true
 }
 
 func (e *Entry) String() string {

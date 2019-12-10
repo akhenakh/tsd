@@ -38,4 +38,4 @@ info,  time delta dyn,   lat delta dyn, lng delta dyn
 The [Facebook's Gorilla paper](https://github.com/dgryski/go-tsz) would perform better but my needs were a bit different.
 
 I needed a time window larger than the limit imposed by the paper (14 bits ~ 4 hours), and a way to store 2 values lat, lng that are closed to the previous one (moving devices).  
-The timestamp storage is the same as the paper but for the values a delta of delta and appropriate storage per entry are good enough and perform better than dict compression.
+The timestamp storage is almost the same as the paper but for the values a delta of delta and appropriate storage per entry are good enough and perform better than dict compression.
