@@ -239,7 +239,6 @@ func TestEncodeDecode(t *testing.T) {
 		if len(entries) != i {
 			t.Fatal("missing entries", i, len(entries))
 		}
-
 	}
 }
 

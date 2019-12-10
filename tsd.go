@@ -74,17 +74,17 @@ func (ts *TimeSeries) Push(t uint32, lat, lng float32) {
 
 	switch {
 	case ts.tdod == 0:
-		denc = TSDelta0
+		denc = Delta0
 	case ts.tdod <= math.MaxInt8 && ts.tdod >= math.MinInt8:
-		denc = TSDelta8
+		denc = Delta8
 		tDelta8 := int8(ts.tdod)
 		binary.Write(buf, binary.BigEndian, tDelta8)
 	case ts.tdod <= math.MaxInt16 && ts.tdod >= math.MinInt16:
-		denc = TSDelta16
+		denc = Delta16
 		tDelta16 := int16(ts.tdod)
 		binary.Write(buf, binary.BigEndian, tDelta16)
 	default:
-		denc = TSFull32
+		denc = Full32
 		binary.Write(buf, binary.BigEndian, t)
 		ts.tdod = 0
 		ts.tdelta = 0
@@ -105,17 +105,17 @@ func (ts *TimeSeries) Push(t uint32, lat, lng float32) {
 
 	switch {
 	case ts.latdod == 0:
-		denc ^= LatDelta0 << 2
+		denc ^= Delta0 << 2
 	case ts.latdod <= math.MaxInt8 && ts.latdod >= math.MinInt8:
-		denc ^= LatDelta8 << 2
+		denc ^= Delta8 << 2
 		latDelta8 := int8(ts.latdod)
 		binary.Write(buf, binary.BigEndian, latDelta8)
 	case ts.latdod <= math.MaxInt16 && ts.latdod >= math.MinInt16:
-		denc ^= LatDelta16 << 2
+		denc ^= Delta16 << 2
 		latDelta16 := int16(ts.latdod)
 		binary.Write(buf, binary.BigEndian, latDelta16)
 	default:
-		denc ^= LatFull32 << 2
+		denc ^= Full32 << 2
 		ts.latdod = 0
 		ts.latdelta = 0
 		binary.Write(buf, binary.BigEndian, ilat)
@@ -134,21 +134,19 @@ func (ts *TimeSeries) Push(t uint32, lat, lng float32) {
 	}
 	ts.lng = ilng
 
-	//fmt.Printf("DEBUG encoding ts %d %d lat %d\t%d\t\t%d\t\tlng\t\t%d\t\t%d\t%d\n", ts.t, ts.tdelta, ilat, ts.latdelta, ts.latdod, ilng, ts.lngdelta, ts.lngdod)
-
 	switch {
 	case ts.lngdod == 0:
-		denc ^= LngDelta0 << 4
+		denc ^= Delta0 << 4
 	case ts.lngdod <= math.MaxInt8 && ts.lngdod >= math.MinInt8:
-		denc ^= LngDelta8 << 4
+		denc ^= Delta8 << 4
 		lngDelta8 := int8(ts.lngdod)
 		binary.Write(buf, binary.BigEndian, lngDelta8)
 	case ts.lngdod <= math.MaxInt16 && ts.lngdod >= math.MinInt16:
-		denc ^= LngDelta16 << 4
+		denc ^= Delta16 << 4
 		lngDelta16 := int16(ts.lngdod)
 		binary.Write(buf, binary.BigEndian, lngDelta16)
 	default:
-		denc ^= LngFull32 << 4
+		denc ^= Full32 << 4
 		ts.lngdod = 0
 		ts.lngdelta = 0
 		binary.Write(buf, binary.BigEndian, ilng)
@@ -196,20 +194,20 @@ func (itr *Iter) Next() bool {
 	}
 
 	denc := DeltaEncoding(itr.ts.b[itr.i])
-	itr.i += 1
+	itr.i++
 
 	var dod int32
 
 	switch denc.TSDelta() {
-	case TSDelta0:
+	case Delta0:
 		dod = 0
-	case TSDelta8:
+	case Delta8:
 		dod = int32(int8(itr.ts.b[itr.i]))
-		itr.i += 1
-	case TSDelta16:
+		itr.i++
+	case Delta16:
 		dod = int32(int16(binary.BigEndian.Uint16(itr.ts.b[itr.i:])))
 		itr.i += 2
-	case TSFull32:
+	case Full32:
 		itr.t = binary.BigEndian.Uint32(itr.ts.b[itr.i:])
 		itr.i += 4
 		itr.tdelta = 0
@@ -222,15 +220,15 @@ func (itr *Iter) Next() bool {
 	var dodCoord int32
 
 	switch denc.LatDelta() {
-	case LatDelta0:
+	case Delta0:
 		dodCoord = 0
-	case LatDelta8:
+	case Delta8:
 		dodCoord = int32(int8(itr.ts.b[itr.i]))
-		itr.i += 1
-	case LatDelta16:
+		itr.i++
+	case Delta16:
 		dodCoord = int32(int16(binary.BigEndian.Uint16(itr.ts.b[itr.i:])))
 		itr.i += 2
-	case LatFull32:
+	case Full32:
 		itr.lat = int32(binary.BigEndian.Uint32(itr.ts.b[itr.i:]))
 		itr.i += 4
 		itr.latdelta = 0
@@ -238,19 +236,18 @@ func (itr *Iter) Next() bool {
 	}
 
 	itr.lat += itr.latdelta + dodCoord
-	itr.latdelta = itr.latdelta + dodCoord
-	//fmt.Printf("DEBUG decoding ts %d %d lat %d\t%d\t\t%d\t\t", itr.t, itr.tdelta, itr.lat, itr.latdelta, dodCoord)
+	itr.latdelta += dodCoord
 
 	switch denc.LngDelta() {
-	case LngDelta0:
+	case Delta0:
 		dodCoord = 0
-	case LngDelta8:
+	case Delta8:
 		dodCoord = int32(int8(itr.ts.b[itr.i]))
-		itr.i += 1
-	case LngDelta16:
+		itr.i++
+	case Delta16:
 		dodCoord = int32(int16(binary.BigEndian.Uint16(itr.ts.b[itr.i:])))
 		itr.i += 2
-	case LngFull32:
+	case Full32:
 		itr.lng = int32(binary.BigEndian.Uint32(itr.ts.b[itr.i:]))
 		itr.i += 4
 		itr.lngdelta = 0
@@ -258,8 +255,7 @@ func (itr *Iter) Next() bool {
 	}
 
 	itr.lng += itr.lngdelta + dodCoord
-	itr.lngdelta = itr.lngdelta + dodCoord
-	//fmt.Printf("lng %d\t%d\t\t%d\n", itr.lng, itr.lngdelta, dodCoord)
+	itr.lngdelta += dodCoord
 
 	return true
 }
