@@ -160,6 +160,46 @@ func TestDeltaOfDelta(t *testing.T) {
 	}
 }
 
+func TestSize(t *testing.T) {
+	const (
+		aTime = uint32(1201986030)
+		lat   = 39.93883
+		lng   = 116.51135
+	)
+	ts := tsd.New()
+
+	ts.Push(aTime, lat, lng) // 4 + 4 + 4 = 12
+	b, _ := ts.MarshalBinary()
+	if len(b) != 12 {
+		t.Fatal("expected 12 values got", len(b))
+	}
+	ts.Push(aTime+10, lat, lng) // 1 + delta 1 = 2
+	b, _ = ts.MarshalBinary()
+	if len(b) != 14 {
+		t.Fatal("expected 14 values got", len(b))
+	}
+	ts.Push(aTime+20, lat, lng) // 1
+	b, _ = ts.MarshalBinary()
+	if len(b) != 15 {
+		t.Fatal("expected 15 values got", len(b))
+	}
+	ts.Push(aTime+30, lat+0.00001, lng) // 1 + delta lat 1 = 2
+	b, _ = ts.MarshalBinary()
+	if len(b) != 17 {
+		t.Fatal("expected 17 values got", len(b))
+	}
+	ts.Push(aTime+40, lat+0.00001, lng) // 1 + delta lat 1 = 2
+	b, _ = ts.MarshalBinary()
+	if len(b) != 19 {
+		t.Fatal("expected 19 values got", len(b))
+	}
+	ts.Push(aTime+50, lat+0.00001, lng) // 1
+	b, _ = ts.MarshalBinary()
+	if len(b) != 20 {
+		t.Fatal("expected 20 values got", len(b))
+	}
+}
+
 func TestEncodeDecode(t *testing.T) {
 	for _, filename := range taxiDataFiles()[:10] {
 		file, err := os.Open(filename)
@@ -203,7 +243,7 @@ func TestEncodeDecode(t *testing.T) {
 	}
 }
 
-func ExamplePush() {
+func ExampleTimeSeries_Push() {
 	ts := tsd.New()
 	ts.Push(1201984833, 39.91071, 116.50962)
 	ts.Push(1201985433, 39.91588, 116.52231)

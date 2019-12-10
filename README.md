@@ -6,7 +6,11 @@ TSD is a time series storage specialized in compressing increasing timestamp and
 It performs better than Snappy & LZ4, on this specific usage without any advanced optimizations but storing deltas and storage size reduction.
 
 ```
-Size: 20088 Snappy 20068    LZ4 18229       TSC 8868
+Size: 64776 Snappy 61007    LZ4 57225       TSC 23948
+Size: 18864 Snappy 18870    LZ4 18267       TSC 9883
+Size: 15768 Snappy 12721    LZ4 11860       TSC 4775
+Size: 7764  Snappy 5440     LZ4 5148        TSC 2122
+Size: 9168  Snappy 7251     LZ4 6933        TSC 3018
 ```
 
 ## Usage
