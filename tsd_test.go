@@ -53,7 +53,7 @@ func TestCompareCompress(t *testing.T) {
 			lz4Size = 2 ^ 32
 		}
 
-		// tsc
+		// tsd
 		file.Seek(0, 0)
 		entries := readTSCoordAsEntries(file)
 		file.Close()
@@ -64,16 +64,16 @@ func TestCompareCompress(t *testing.T) {
 		}
 
 		b, _ = ts.MarshalBinary()
-		tscSize := len(b)
+		tsdSize := len(b)
 
-		if lz4Size < tscSize {
+		if lz4Size < tsdSize {
 			t.Log("LZ4 better Compressed", lz4Size, len(b))
 		}
-		if snapSize < tscSize {
+		if snapSize < tsdSize {
 			t.Log("Snappy better Compressed", snapSize, len(b))
 		}
 
-		t.Logf("Size: %d\tSnappy %d\tLZ4 %d\tTSC %d", fullSize, snapSize, lz4Size, tscSize)
+		t.Logf("Size: %d\tSnappy %d\tLZ4 %d\tTSD %d", fullSize, snapSize, lz4Size, tsdSize)
 	}
 }
 
