@@ -175,7 +175,9 @@ func (ts *TimeSeries) MarshalBinary() ([]byte, error) {
 
 // UnmarshalBinary unmarshal from cold storage into a live in memory timeseries
 func (ts *TimeSeries) UnmarshalBinary(data []byte) error {
-	ts.b = data
+	b := make([]byte, len(data))
+	copy(b, data)
+	ts.b = b
 	itr := ts.Iter()
 	for itr.Next() {
 	}
