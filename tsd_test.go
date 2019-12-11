@@ -73,7 +73,7 @@ func TestCompareCompress(t *testing.T) {
 			t.Log("Snappy better Compressed", snapSize, len(b))
 		}
 
-		t.Logf("Size: %d\tSnappy %d\tLZ4 %d\tTSD %d", fullSize, snapSize, lz4Size, tsdSize)
+		t.Logf("File: %s\t Size: %d\tSnappy %d\tLZ4 %d\tTSD %d", filename, fullSize, snapSize, lz4Size, tsdSize)
 	}
 }
 
