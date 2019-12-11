@@ -14,6 +14,9 @@ type TimeSeries struct {
 
 	//  info,  time delta dyn,   lat dyn, lng dyn
 	//   1          n,                   n,      n
+
+	// in memory compressed storage
+	// note the cap of this slice is manage by append()
 	b []byte
 
 	// current
@@ -187,10 +190,19 @@ func (itr *Iter) Next() bool {
 	// read header
 	if itr.i == 0 {
 		buf := bytes.NewReader(itr.ts.b)
-		binary.Read(buf, binary.BigEndian, &itr.t)
-		binary.Read(buf, binary.BigEndian, &itr.lat)
-		binary.Read(buf, binary.BigEndian, &itr.lng)
-
+		var err error
+		read := func(data interface{}) {
+			if err != nil {
+				return
+			}
+			err = binary.Read(buf, binary.BigEndian, data)
+		}
+		read(&itr.t)
+		read(&itr.lat)
+		read(&itr.lng)
+		if err != nil {
+			return false
+		}
 		itr.i = 12
 		return true
 	}
@@ -202,6 +214,11 @@ func (itr *Iter) Next() bool {
 
 	denc := DeltaEncoding(itr.ts.b[itr.i])
 	itr.i++
+
+	// it's probably a bogus entry
+	if denc > 0b111111 {
+		return false
+	}
 
 	var dod int32
 
