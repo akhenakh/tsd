@@ -54,7 +54,7 @@ func TestCompareCompress(t *testing.T) {
 		}
 
 		// tsd
-		file.Seek(0, 0)
+		_, _ = file.Seek(0, 0)
 		entries := readTSCoordAsEntries(file)
 		file.Close()
 

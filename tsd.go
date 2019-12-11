@@ -49,15 +49,7 @@ func New() *TimeSeries {
 func (ts *TimeSeries) Push(t uint32, lat, lng float32) {
 	// simply write as is
 	if len(ts.b) == 0 {
-		buf := new(bytes.Buffer)
-		binary.Write(buf, binary.BigEndian, t)
-		ts.lat = int32(math.Round(float64(lat) * 100_000))
-		ts.lng = int32(math.Round(float64(lng) * 100_000))
-		binary.Write(buf, binary.BigEndian, ts.lat)
-		binary.Write(buf, binary.BigEndian, ts.lng)
-
-		ts.b = buf.Bytes()
-		ts.t = t
+		ts.writeHeader(t, lat, lng)
 		return
 	}
 
@@ -160,6 +152,17 @@ func (ts *TimeSeries) Push(t uint32, lat, lng float32) {
 
 	ts.b = append(ts.b, byte(denc))
 	ts.b = append(ts.b, buf.Bytes()...)
+}
+
+func (ts *TimeSeries) writeHeader(t uint32, lat float32, lng float32) {
+	b := make([]byte, 12)
+	binary.BigEndian.PutUint32(b, t)
+	ts.lat = int32(math.Round(float64(lat) * 100_000))
+	ts.lng = int32(math.Round(float64(lng) * 100_000))
+	binary.BigEndian.PutUint32(b[4:], uint32(ts.lat))
+	binary.BigEndian.PutUint32(b[8:], uint32(ts.lng))
+	ts.b = b
+	ts.t = t
 }
 
 // MarshalBinary marshal into binary for cold storage
