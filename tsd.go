@@ -6,6 +6,7 @@ import (
 	"math"
 )
 
+// TimeSeries handles compressed in memory storage
 type TimeSeries struct {
 	// Format is as follow
 	// header ts uint32,   lat float32, lng float32
@@ -24,6 +25,7 @@ type TimeSeries struct {
 	latdelta, lngdelta int32
 }
 
+// Iter to iterate other the timeseries values
 type Iter struct {
 	ts *TimeSeries
 	i  uint
@@ -35,6 +37,7 @@ type Iter struct {
 	latdelta, lngdelta int32
 }
 
+// New returns a new timeseries
 func New() *TimeSeries {
 	return &TimeSeries{}
 }
@@ -156,10 +159,12 @@ func (ts *TimeSeries) Push(t uint32, lat, lng float32) {
 	ts.b = append(ts.b, buf.Bytes()...)
 }
 
+// MarshalBinary marshal into binary for cold storage
 func (ts *TimeSeries) MarshalBinary() ([]byte, error) {
 	return ts.b, nil
 }
 
+// UnmarshalBinary unmarshal from cold storage into a live in memory timeseries
 func (ts *TimeSeries) UnmarshalBinary(data []byte) error {
 	ts.b = data
 	itr := ts.Iter()
@@ -168,10 +173,12 @@ func (ts *TimeSeries) UnmarshalBinary(data []byte) error {
 	return nil
 }
 
+// Iter returns a new iterator from the beginning
 func (ts *TimeSeries) Iter() *Iter {
 	return &Iter{ts: ts}
 }
 
+// Next returns true if there is still a value available
 func (itr *Iter) Next() bool {
 	if len(itr.ts.b) < 12 {
 		return false
