@@ -10,4 +10,4 @@ name = "go"
 enabled = true
 
   [analyzers.meta]
-  import_path = "github.com/akhenakh/tsd
+  import_path = "github.com/akhenakh/tsd"
