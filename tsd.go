@@ -3,6 +3,7 @@ package tsd
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"math"
 )
 
@@ -39,6 +40,8 @@ type Iter struct {
 	lat, lng           int32
 	latdelta, lngdelta int32
 }
+
+var readErr = errors.New("read error invalid data")
 
 // New returns a new timeseries
 func New() *TimeSeries {
@@ -223,68 +226,104 @@ func (itr *Iter) Next() bool {
 		return false
 	}
 
+	// ts dod
+	dod, err := itr.readTSDoD(denc.TSDelta())
+	if err != nil {
+		return false
+	}
+	itr.t += uint32(int32(itr.tdelta) + dod)
+	itr.tdelta = uint32(int32(itr.tdelta) + dod)
+
+	// lat dod
+	dod, err = itr.readCoordDoD(denc.LatDelta())
+	if err != nil {
+		return false
+	}
+	if denc.LatDelta() == Full32 {
+		itr.latdelta = 0
+		itr.lat = dod
+		dod = 0
+	} else {
+		itr.lat += itr.latdelta + dod
+	}
+	itr.latdelta += dod
+
+	// lng dod
+	dod, err = itr.readCoordDoD(denc.LngDelta())
+	if err != nil {
+		return false
+	}
+	if denc.LngDelta() == Full32 {
+		itr.lngdelta = 0
+		itr.lng = dod
+		dod = 0
+	} else {
+		itr.lng += itr.lngdelta + dod
+	}
+	itr.lngdelta += dod
+
+	return true
+}
+
+func (itr *Iter) readCoordDoD(denc DeltaEncoding) (int32, error) {
 	var dod int32
 
-	switch denc.TSDelta() {
+	switch denc {
 	case Delta0:
 		dod = 0
 	case Delta8:
+		if itr.i+1 > uint(len(itr.ts.b)) {
+			return 0, readErr
+		}
 		dod = int32(int8(itr.ts.b[itr.i]))
 		itr.i++
 	case Delta16:
+		if itr.i+2 > uint(len(itr.ts.b)) {
+			return 0, readErr
+		}
 		dod = int32(int16(binary.BigEndian.Uint16(itr.ts.b[itr.i:])))
 		itr.i += 2
 	case Full32:
+		if itr.i+4 > uint(len(itr.ts.b)) {
+			return 0, readErr
+		}
+
+		// on this case we return the actual value and not the dod which will be 0
+		val := int32(binary.BigEndian.Uint32(itr.ts.b[itr.i:]))
+		itr.i += 4
+		return val, nil
+	}
+	return dod, nil
+}
+
+func (itr *Iter) readTSDoD(denc DeltaEncoding) (int32, error) {
+	var dod int32
+
+	switch denc {
+	case Delta0:
+		dod = 0
+	case Delta8:
+		if itr.i+1 > uint(len(itr.ts.b)) {
+			return 0, readErr
+		}
+		dod = int32(int8(itr.ts.b[itr.i]))
+		itr.i++
+	case Delta16:
+		if itr.i+2 > uint(len(itr.ts.b)) {
+			return 0, readErr
+		}
+		dod = int32(int16(binary.BigEndian.Uint16(itr.ts.b[itr.i:])))
+		itr.i += 2
+	case Full32:
+		if itr.i+4 > uint(len(itr.ts.b)) {
+			return 0, readErr
+		}
 		itr.t = binary.BigEndian.Uint32(itr.ts.b[itr.i:])
 		itr.i += 4
 		itr.tdelta = 0
 		dod = 0
 	}
-
-	itr.t += uint32(int32(itr.tdelta) + dod)
-	itr.tdelta = uint32(int32(itr.tdelta) + dod)
-
-	var dodCoord int32
-
-	switch denc.LatDelta() {
-	case Delta0:
-		dodCoord = 0
-	case Delta8:
-		dodCoord = int32(int8(itr.ts.b[itr.i]))
-		itr.i++
-	case Delta16:
-		dodCoord = int32(int16(binary.BigEndian.Uint16(itr.ts.b[itr.i:])))
-		itr.i += 2
-	case Full32:
-		itr.lat = int32(binary.BigEndian.Uint32(itr.ts.b[itr.i:]))
-		itr.i += 4
-		itr.latdelta = 0
-		dodCoord = 0
-	}
-
-	itr.lat += itr.latdelta + dodCoord
-	itr.latdelta += dodCoord
-
-	switch denc.LngDelta() {
-	case Delta0:
-		dodCoord = 0
-	case Delta8:
-		dodCoord = int32(int8(itr.ts.b[itr.i]))
-		itr.i++
-	case Delta16:
-		dodCoord = int32(int16(binary.BigEndian.Uint16(itr.ts.b[itr.i:])))
-		itr.i += 2
-	case Full32:
-		itr.lng = int32(binary.BigEndian.Uint32(itr.ts.b[itr.i:]))
-		itr.i += 4
-		itr.lngdelta = 0
-		dodCoord = 0
-	}
-
-	itr.lng += itr.lngdelta + dodCoord
-	itr.lngdelta += dodCoord
-
-	return true
+	return dod, nil
 }
 
 // Values returns ts, lat, lng
