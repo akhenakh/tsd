@@ -106,6 +106,21 @@ func TestUnmarshalBinary(t *testing.T) {
 	}
 }
 
+func TestBogus(t *testing.T) {
+	if unmarshalAndIterCount("47") > 0 {
+		t.Fatal("expected not to iterate over data")
+	}
+	if unmarshalAndIterCount("47a4d541003ce61f00b1c79240") > 1 {
+		t.Fatal("expected to fail on wrong control byte")
+	}
+	if unmarshalAndIterCount("47a4d541003ce61f00b1c79201") > 1 {
+		t.Fatal("expected to fail on one missing byte")
+	}
+	if unmarshalAndIterCount("47a4d541003ce61f00b1c7921f") > 1 {
+		t.Fatal("expected to fail on 12 missing bytes")
+	}
+}
+
 func TestDeltaOfDelta(t *testing.T) {
 	ts := tsd.New()
 	const aTime = uint32(1201986030)
@@ -369,4 +384,17 @@ func taxiDataFiles() []string {
 
 func (e *Entry) String() string {
 	return fmt.Sprintf("%d %f %f", e.Ts, e.Lng, e.Lat)
+}
+
+func unmarshalAndIterCount(s string) int {
+	b, _ := hex.DecodeString(s)
+	ts := tsd.New()
+	_ = ts.UnmarshalBinary(b)
+
+	itr := ts.Iter()
+	i := 0
+	for itr.Next() {
+		i++
+	}
+	return i
 }
