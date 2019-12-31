@@ -14,6 +14,7 @@ Size: 15768 Snappy 12721    LZ4 11860       TSD 4775
 Size: 7764  Snappy 5440     LZ4 5148        TSD 2122
 Size: 9168  Snappy 7251     LZ4 6933        TSD 3018
 ```
+[Here is a blog post I wrote to describe this project](https://blog.nobugware.com/post/2019/time_series_storage_for_coordinates/)
 
 ## Usage
 
